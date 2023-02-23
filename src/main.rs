@@ -16,16 +16,25 @@ fn main() {
     }
 }
 
-fn handle_connection(mut stream: TcpStream) {
-    let buf_reader = BufReader::new(&stream);
-    let _http_request: Vec<_> = buf_reader
-        .lines()
-        .map(|result| result.unwrap())
-        .take_while(|line| !line.is_empty())
-        .collect();
-    let status_line = "HTTP/1.1 200 OK";
-    let contents = fs::read_to_string("hello.html").unwrap();
+fn handle_get_request(mut stream: TcpStream, is_success: bool, path: &str) {
+    let status_line = if is_success {
+        "HTTP/1.1 200 OK"
+    } else {
+        "HTTP/1.1 404 NOT FOUND"
+    };
+    let contents = fs::read_to_string(path).unwrap();
     let length = contents.len();
     let response = format!("{status_line}\r\nContent-Length: {length}\r\n\r\n{contents}");
     stream.write_all(response.as_bytes()).unwrap();
+}
+
+fn handle_connection(stream: TcpStream) {
+    let buf_reader = BufReader::new(&stream);
+    let request_line = buf_reader.lines().next().unwrap().unwrap();
+
+    if request_line == "GET / HTTP/1.1" {
+        handle_get_request(stream, true, "hello.html")
+    } else {
+        handle_get_request(stream, false, "404.html")
+    }
 }
