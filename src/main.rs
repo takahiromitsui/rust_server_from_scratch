@@ -1,6 +1,6 @@
 use std::{
-    net::{SocketAddr, IpAddr, Ipv4Addr},
-    os::unix::prelude::{RawFd},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    os::unix::prelude::RawFd,
 };
 
 struct MyTcpListener {
@@ -8,6 +8,7 @@ struct MyTcpListener {
 }
 
 impl MyTcpListener {
+    // step 2: Identify a socket
     fn bind(addr: SocketAddr) -> Result<MyTcpListener, std::io::Error> {
         // e.g., Inet = IPv4, Inet6 = IPv6
         let domain = nix::sys::socket::AddressFamily::Inet;
@@ -24,35 +25,52 @@ impl MyTcpListener {
         let addr =
             nix::sys::socket::SockAddr::new_inet(nix::sys::socket::InetAddr::from_std(&addr));
         nix::sys::socket::bind(fd, &addr).unwrap();
+
+        // Step3:Wait for incoming connections
         // defines the maximum number of pending connections that can be queued up before connections are refused.
         //e.g., 10
         nix::sys::socket::listen(fd, 10).unwrap();
         Ok(MyTcpListener { fd })
     }
     fn accept(&self) {
-        let mut buf = [0u8; 3000];
-        // step4: send and receive messages
-        match nix::unistd::read(self.fd, &mut buf) {
-            Ok(_val_read) => {
-                let hello = "Hello from server";
-                nix::unistd::write(self.fd, hello.as_bytes()).unwrap();
+        loop {
+            // accept a new connection
+            let new_fd = match nix::sys::socket::accept(self.fd) {
+                Ok(fd) => fd,
+                Err(e) => {
+                    println!("Error accepting connection: {}", e);
+                    continue;
+                }
+            };
+
+            // Step4: Send and receive messages
+            // read from the new socket
+            let mut buf = [0u8; 3000];
+            match nix::unistd::read(new_fd, &mut buf) {
+                Ok(val_read) if val_read > 0 => {
+                    // write back to the new socket
+                    let hello = "Hello from server";
+                    match nix::unistd::write(new_fd, hello.as_bytes()) {
+                        Ok(_) => println!("Sent response: {}", hello),
+                        Err(e) => println!("Error sending response: {}", e),
+                    }
+                }
+                Ok(_) => println!("Empty message received"),
+                Err(e) => println!("Error reading data: {}", e),
             }
-            Err(e) => {
-                println!("Error: {}", e);
-                return;
+
+            // Step5: Close the new socket
+            match nix::unistd::close(new_fd) {
+                Ok(_) => println!("Closed connection"),
+                Err(e) => println!("Error closing socket: {}", e),
             }
-        };
-        // step5: close the socket
-        match nix::unistd::close(self.fd) {
-            Ok(_) => println!("Successfully closed the socket"),
-            Err(e) => println!("Error: {}", e),
         }
     }
 }
 
 fn main() {
     // let address = "127.0.0.1:5000";
-    let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+    let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 3000);
     // 127.0.0.1 is the local host
     // bind is equivalent to new
     // let listener = TcpListener::bind(address).unwrap();
