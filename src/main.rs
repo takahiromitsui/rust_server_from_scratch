@@ -8,7 +8,10 @@ fn main() {
     // 127.0.0.1 is the local host
     // bind is equivalent to new
     // let listener = TcpListener::bind(address).unwrap();
-    let listener = MyTcpListener::bind(socket).unwrap();
+    let mut routes = std::collections::HashMap::new();
+    routes.insert(String::from("/hello"), String::from("hello.html"));
+    routes.insert(String::from("/404"), String::from("404.html"));
+    let listener = MyTcpListener::bind(socket, routes).unwrap();
     listener.accept();
     // for stream in listener.incoming() {
     //     let stream = stream.unwrap();
