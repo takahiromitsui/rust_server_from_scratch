@@ -1,3 +1,5 @@
+mod models;
+
 use std::{net::SocketAddr, os::unix::prelude::RawFd};
 pub struct MyTcpListener {
     fd: RawFd, // raw file descriptor
@@ -45,7 +47,7 @@ impl MyTcpListener {
             match nix::unistd::read(new_fd, &mut buf) {
                 Ok(val_read) if val_read > 0 => {
                     // write back to the new socket
-                    let hello = "Hello from server";
+                    let hello = "HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: 12\n\nHello world!";
                     match nix::unistd::write(new_fd, hello.as_bytes()) {
                         Ok(_) => println!("Sent response: {}", hello),
                         Err(e) => println!("Error sending response: {}", e),
