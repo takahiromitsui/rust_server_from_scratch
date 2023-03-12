@@ -22,17 +22,20 @@ impl MyTcpListener {
         // e.g., Tcp = TCP, Udp = UDP
         let protocol = nix::sys::socket::SockProtocol::Tcp;
         // file descriptor
-        let fd = nix::sys::socket::socket(domain, socket_type, flags, protocol).unwrap();
+        let fd = nix::sys::socket::socket(domain, socket_type, flags, protocol)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
         // bind the socket to the address
         let addr =
             nix::sys::socket::SockAddr::new_inet(nix::sys::socket::InetAddr::from_std(&addr));
-        nix::sys::socket::bind(fd, &addr).unwrap();
+        nix::sys::socket::bind(fd, &addr)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
         // Step3:Wait for incoming connections
         // defines the maximum number of pending connections that can be queued up before connections are refused.
         //e.g., 10
-        nix::sys::socket::listen(fd, 10).unwrap();
+        nix::sys::socket::listen(fd, 10)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         Ok(MyTcpListener {
             fd,
             routes,
