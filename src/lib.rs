@@ -34,7 +34,6 @@ impl MyTcpListener {
         Ok(MyTcpListener { fd, routes })
     }
     pub fn accept(&self) {
-        let routes = Arc::new(Mutex::new(self.routes.clone()));
         loop {
             // accept a new connection
             let new_fd = match nix::sys::socket::accept(self.fd) {
@@ -44,9 +43,8 @@ impl MyTcpListener {
                     continue;
                 }
             };
-
-            // clone the routes Arc before moving it into the closure
-            let cloned_routes = routes.clone();
+            // clone the routes
+            let routes = Arc::new(Mutex::new(self.routes.clone()));
 
             // spawn a new thread to handle the incoming connection
             std::thread::spawn(move || {
@@ -68,7 +66,7 @@ impl MyTcpListener {
                             tokens[1]
                         };
                         // find the corresponding handler for the requested route
-                        let handler = cloned_routes.lock().unwrap().get(file_path).cloned();
+                        let handler = routes.lock().unwrap().get(file_path).cloned();
 
                         // write back to the new socket
                         let response = match handler {
