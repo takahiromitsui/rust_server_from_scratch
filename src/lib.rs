@@ -3,6 +3,7 @@ use std::{collections::HashMap, net::SocketAddr, os::unix::prelude::RawFd, sync:
 pub struct MyTcpListener {
     fd: RawFd, // raw file descriptor
     routes: HashMap<String, String>,
+    root_dir: String,
 }
 
 impl MyTcpListener {
@@ -10,6 +11,7 @@ impl MyTcpListener {
     pub fn bind(
         addr: SocketAddr,
         routes: HashMap<String, String>,
+        root_dir: String,
     ) -> Result<MyTcpListener, std::io::Error> {
         // e.g., Inet = IPv4, Inet6 = IPv6
         let domain = nix::sys::socket::AddressFamily::Inet;
@@ -31,7 +33,11 @@ impl MyTcpListener {
         // defines the maximum number of pending connections that can be queued up before connections are refused.
         //e.g., 10
         nix::sys::socket::listen(fd, 10).unwrap();
-        Ok(MyTcpListener { fd, routes })
+        Ok(MyTcpListener {
+            fd,
+            routes,
+            root_dir,
+        })
     }
     pub fn accept(&self) {
         loop {
@@ -44,7 +50,9 @@ impl MyTcpListener {
                 }
             };
             // clone the routes
-            let routes = Arc::new(Mutex::new(self.routes.clone()));
+            let _routes = Arc::new(Mutex::new(self.routes.clone()));
+            // clone the root_dir
+            let root_dir = self.root_dir.clone();
 
             // spawn a new thread to handle the incoming connection
             std::thread::spawn(move || {
@@ -61,25 +69,30 @@ impl MyTcpListener {
 
                         // get the requested file path from the URL
                         let file_path = if tokens[1] == "/" {
-                            "/hello"
+                            "/index"
                         } else {
                             tokens[1]
                         };
                         // find the corresponding handler for the requested route
-                        let handler = routes.lock().unwrap().get(file_path).cloned();
+                        // let handler = routes.lock().unwrap().get(file_path).cloned();
+                        let file =
+                            std::fs::read_to_string(format!("{}{}.html", root_dir, file_path));
+                        let not_found = std::fs::read_to_string(format!("{}/404.html", root_dir));
 
                         // write back to the new socket
-                        let response = match handler {
-                            Some(f) => {
-                                let body = f;
+                        let response = match file {
+                            Ok(body) => {
                                 format!(
                                     "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: {}\n\n{}",
                                     body.len(),
                                     body
                                 )
                             }
-                            None => {
-                                let body = "404 Not Found";
+                            Err(_) => {
+                                let body = match not_found {
+                                    Ok(body) => body,
+                                    Err(_) => "404 Not Found".to_string(),
+                                };
                                 format!(
                                     "HTTP/1.1 404 Not Found\nContent-Type: text/html\nContent-Length: {}\n\n{}",
                                     body.len(),

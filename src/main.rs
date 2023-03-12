@@ -9,9 +9,10 @@ fn main() {
     // bind is equivalent to new
     // let listener = TcpListener::bind(address).unwrap();
     let mut routes = std::collections::HashMap::new();
+    let root_dir = String::from("src/views");
     routes.insert(String::from("/hello"), String::from("hello.html"));
     routes.insert(String::from("/404"), String::from("404.html"));
-    let listener = MyTcpListener::bind(socket, routes).unwrap();
+    let listener = MyTcpListener::bind(socket, routes, root_dir).unwrap();
     listener.accept();
     // for stream in listener.incoming() {
     //     let stream = stream.unwrap();
