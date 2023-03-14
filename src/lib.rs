@@ -58,7 +58,7 @@ impl MyTcpListener {
         //e.g., 10
         nix::sys::socket::listen(fd, 10)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-        println!("Listening on {:?}", addr);
+        // println!("Listening on {:?}", addr);
         Ok(Self { fd })
     }
 
@@ -70,13 +70,25 @@ impl MyTcpListener {
                     return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
                 }
             };
-            println!("Accepted connection on fd {}", stream_fd);
+            // println!("Accepted connection on fd {}", stream_fd);
             return Ok(MyTcpStream::new(stream_fd));
     }
 
-    pub fn serve_html(stream: &mut MyTcpStream, path: &str) -> Result<(), std::io::Error> {
-        let file = std::fs::read_to_string(format!("{}.html", path));
-        let not_found = std::fs::read_to_string("src/views/404.html");
+    pub fn serve_html(buffer:&mut [u8], stream: &mut MyTcpStream, root: &str) -> Result<(), std::io::Error> {
+        let val_read = stream.read(buffer);
+        let request = String::from_utf8_lossy(&buffer[..val_read.unwrap()]);
+        let request_lines: Vec<&str> = request.lines().collect();
+        let request_line = request_lines[0];
+        let tokens: Vec<&str> = request_line.split_whitespace().collect();
+
+        // get the requested file path from the URL
+        let file_path = if tokens[1] == "/" {
+            "/index"
+        } else {
+            tokens[1]
+        };
+        let file = std::fs::read_to_string(format!("{}{}.html", root, file_path));
+        let not_found = std::fs::read_to_string(format!("{}/404.html", root));
         // write back to the new socket
         let response = match file {
             Ok(body) => {

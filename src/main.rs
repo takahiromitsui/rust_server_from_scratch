@@ -12,11 +12,8 @@ fn main() -> std::io::Result<()> {
                 continue;
             }
         };
-        println!("Accepted connection");
-
         let mut buffer = [0; 1024];
-        stream.read(&mut buffer)?;
-        MyTcpListener::serve_html(&mut stream, "src/views/index")?;
+        MyTcpListener::serve_html(&mut buffer,&mut stream, "src/views")?;
 
         stream.flush()?;
     }
