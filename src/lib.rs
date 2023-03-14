@@ -1,7 +1,6 @@
-use std::sync::Mutex;
-use std::{collections::HashMap, net::SocketAddr, os::unix::prelude::RawFd, sync::Arc};
+use std::{net::SocketAddr, os::unix::prelude::RawFd};
 
-use std::io::{self, Read, Write};
+use std::io;
 
 pub struct MyTcpStream {
     fd: RawFd,
@@ -64,7 +63,6 @@ impl MyTcpListener {
     }
 
     pub fn accept(&self) -> Result<MyTcpStream, std::io::Error> {
-        loop {
             let stream_fd = match nix::sys::socket::accept(self.fd) {
                 Ok(fd) => fd,
                 Err(e) => {
@@ -74,85 +72,34 @@ impl MyTcpListener {
             };
             println!("Accepted connection on fd {}", stream_fd);
             return Ok(MyTcpStream::new(stream_fd));
-        }
     }
 
-    // pub fn accept(&self) {
-    //     loop {
-    //         // accept a new connection
-    // let new_fd = match nix::sys::socket::accept(self.fd) {
-    //     Ok(fd) => fd,
-    //     Err(e) => {
-    //         println!("Error accepting connection: {}", e);
-    //         continue;
-    //     }
-    // };
-    //         // clone the routes
-    //         let _routes = Arc::new(Mutex::new(self.routes.clone()));
-    //         // clone the root_dir
-    //         let root_dir = self.root_dir.clone();
+    pub fn serve_html(stream: &mut MyTcpStream, path: &str) -> Result<(), std::io::Error> {
+        let file = std::fs::read_to_string(format!("{}.html", path));
+        let not_found = std::fs::read_to_string("src/views/404.html");
+        // write back to the new socket
+        let response = match file {
+            Ok(body) => {
+                format!(
+                    "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: {}\n\n{}",
+                    body.len(),
+                    body
+                )
+            }
+            Err(_) => {
+                let body = match not_found {
+                    Ok(body) => body,
+                    Err(_) => "404 Not Found".to_string(),
+                };
+                format!(
+                    "HTTP/1.1 404 Not Found\nContent-Type: text/html\nContent-Length: {}\n\n{}",
+                    body.len(),
+                    body
+                )
+            }
+        };
+        stream.write(response.as_bytes())?;
+        Ok(())
+    }
 
-    //         // spawn a new thread to handle the incoming connection
-    //         std::thread::spawn(move || {
-    //             // Step4: Send and receive messages
-    //             // read from the new socket
-    //             let mut buf = [0u8; 3000];
-    //             match nix::unistd::read(new_fd, &mut buf) {
-    //                 Ok(val_read) if val_read > 0 => {
-    //                     // parse HTTP request
-    //                     let request = std::str::from_utf8(&buf).unwrap();
-    //                     let request_lines: Vec<&str> = request.lines().collect();
-    //                     let request_line = request_lines[0];
-    //                     let tokens: Vec<&str> = request_line.split_whitespace().collect();
-
-    //                     // get the requested file path from the URL
-    //                     let file_path = if tokens[1] == "/" {
-    //                         "/index"
-    //                     } else {
-    //                         tokens[1]
-    //                     };
-    //                     // find the corresponding handler for the requested route
-    //                     // let handler = routes.lock().unwrap().get(file_path).cloned();
-    //                     let file =
-    //                         std::fs::read_to_string(format!("{}{}.html", root_dir, file_path));
-    //                     let not_found = std::fs::read_to_string(format!("{}/404.html", root_dir));
-
-    //                     // write back to the new socket
-    //                     let response = match file {
-    //                         Ok(body) => {
-    //                             format!(
-    //                                 "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: {}\n\n{}",
-    //                                 body.len(),
-    //                                 body
-    //                             )
-    //                         }
-    //                         Err(_) => {
-    //                             let body = match not_found {
-    //                                 Ok(body) => body,
-    //                                 Err(_) => "404 Not Found".to_string(),
-    //                             };
-    //                             format!(
-    //                                 "HTTP/1.1 404 Not Found\nContent-Type: text/html\nContent-Length: {}\n\n{}",
-    //                                 body.len(),
-    //                                 body
-    //                             )
-    //                         }
-    //                     };
-    //                     match nix::unistd::write(new_fd, response.as_bytes()) {
-    //                         Ok(_) => println!("Sent response: {}", response),
-    //                         Err(e) => println!("Error sending response: {}", e),
-    //                     }
-    //                 }
-    //                 Ok(_) => println!("Empty message received"),
-    //                 Err(e) => println!("Error reading data: {}", e),
-    //             }
-
-    //             // Step5: Close the new socket
-    //             match nix::unistd::close(new_fd) {
-    //                 Ok(_) => println!("Closed connection"),
-    //                 Err(e) => println!("Error closing socket: {}", e),
-    //             }
-    //         });
-    //     }
-    // }
 }
