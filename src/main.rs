@@ -1,4 +1,11 @@
 use rust_server::MyTcpListener;
+use serde::Serialize;
+
+#[derive(Serialize)]
+struct Message {
+    text: String,
+    author: String,
+}
 
 fn main() -> std::io::Result<()> {
     let addr = "127.0.0.1:8080";
@@ -13,7 +20,12 @@ fn main() -> std::io::Result<()> {
             }
         };
         let mut buffer = [0; 1024];
-        MyTcpListener::serve_html(&mut buffer,&mut stream, "src/views")?;
+        let message = Message {
+            text: "Hello, world!".to_string(),
+            author: "Rust".to_string(),
+        };
+        MyTcpListener::serve_html(&mut buffer, &mut stream, "src/views")?;
+        MyTcpListener::post_json(&mut buffer, &mut stream, "/message", &message)?;
 
         stream.flush()?;
     }
