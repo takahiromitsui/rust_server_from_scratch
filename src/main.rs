@@ -20,13 +20,12 @@ fn main() -> std::io::Result<()> {
             }
         };
         let mut buffer = [0; 1024];
-        let message = Message {
-            text: "Hello, world!".to_string(),
-            author: "Rust".to_string(),
-        };
+       
         MyTcpListener::serve_html(&mut buffer, &mut stream, "src/views")?;
-        MyTcpListener::post_json(&mut buffer, &mut stream, "/message", &message)?;
-
+        MyTcpListener::post_json(&mut buffer, &mut stream, "/login", |json| {
+            json["username"] = serde_json::Value::String("my_username".to_string());
+            json["password"] = serde_json::Value::String("my_password".to_string());
+        }).unwrap();
         stream.flush()?;
     }
 }

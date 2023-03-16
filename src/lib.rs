@@ -119,15 +119,25 @@ impl MyTcpListener {
         Ok(())
     }
 
-    pub fn post_json<T: Serialize>(
+    pub fn post_json<F>(
         buffer: &mut [u8],
         stream: &mut MyTcpStream,
         path: &str,
-        data: &T,
-    ) -> Result<String, std::io::Error> {
+        update_json: F,
+    ) -> Result<String, std::io::Error>
+    where
+        F: FnOnce(&mut serde_json::Value),
+    {
+        // Create an empty JSON value
+        let mut json_data = serde_json::json!({});
+    
+        // Call the closure to update the JSON value with user input
+        update_json(&mut json_data);
+    
         // Serialize the JSON data
-        let json_data = serde_json::to_string(data)?;
-
+        let json_data_str = serde_json::to_string(&json_data)?;
+        println!("json_data_str: {}", json_data_str);
+    
         // Send the HTTP POST request with the JSON data
         let request = format!(
             "POST {} HTTP/1.1\r\n\
@@ -136,14 +146,16 @@ impl MyTcpListener {
             \r\n\
             {}",
             path,
-            json_data.len(),
-            json_data
+            json_data_str.len(),
+            json_data_str
         );
         stream.write(request.as_bytes())?;
-
+    
         // Read the response
         let len = stream.read(buffer)?;
         let response = String::from_utf8_lossy(&buffer[..len]).to_string();
+        println!("response: {}", response);
         Ok(response)
     }
+    
 }
