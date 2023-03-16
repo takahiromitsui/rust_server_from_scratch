@@ -1,6 +1,5 @@
 use std::{net::SocketAddr, os::unix::prelude::RawFd};
 
-use serde::Serialize;
 use std::io;
 
 pub struct MyTcpStream {
@@ -136,8 +135,7 @@ impl MyTcpListener {
     
         // Serialize the JSON data
         let json_data_str = serde_json::to_string(&json_data)?;
-        println!("json_data_str: {}", json_data_str);
-    
+        
         // Send the HTTP POST request with the JSON data
         let request = format!(
             "POST {} HTTP/1.1\r\n\
@@ -150,11 +148,21 @@ impl MyTcpListener {
             json_data_str
         );
         stream.write(request.as_bytes())?;
-    
+
         // Read the response
         let len = stream.read(buffer)?;
         let response = String::from_utf8_lossy(&buffer[..len]).to_string();
-        println!("response: {}", response);
+        let response_lines: Vec<&str> = response.lines().collect();
+        if response_lines.len() == 0 {
+           println!("No response from server");
+        } else {
+              let response_line = response_lines[0];
+              let tokens: Vec<&str> = response_line.split_whitespace().collect();
+              let status_code = tokens[1];
+              println!("Status code: {}", status_code);
+              println!("Response: {}", response);
+        }
+        
         Ok(response)
     }
     
