@@ -1,5 +1,6 @@
 use std::{net::SocketAddr, os::unix::prelude::RawFd};
 
+use serde::Serialize;
 use std::io;
 
 pub struct MyTcpStream {
@@ -63,18 +64,22 @@ impl MyTcpListener {
     }
 
     pub fn accept(&self) -> Result<MyTcpStream, std::io::Error> {
-            let stream_fd = match nix::sys::socket::accept(self.fd) {
-                Ok(fd) => fd,
-                Err(e) => {
-                    println!("Error accepting connection: {}", e);
-                    return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
-                }
-            };
-            // println!("Accepted connection on fd {}", stream_fd);
-            return Ok(MyTcpStream::new(stream_fd));
+        let stream_fd = match nix::sys::socket::accept(self.fd) {
+            Ok(fd) => fd,
+            Err(e) => {
+                println!("Error accepting connection: {}", e);
+                return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
+            }
+        };
+        // println!("Accepted connection on fd {}", stream_fd);
+        return Ok(MyTcpStream::new(stream_fd));
     }
 
-    pub fn serve_html(buffer:&mut [u8], stream: &mut MyTcpStream, root: &str) -> Result<(), std::io::Error> {
+    pub fn serve_html(
+        buffer: &mut [u8],
+        stream: &mut MyTcpStream,
+        root: &str,
+    ) -> Result<(), std::io::Error> {
         let val_read = stream.read(buffer);
         let request = String::from_utf8_lossy(&buffer[..val_read.unwrap()]);
         let request_lines: Vec<&str> = request.lines().collect();
@@ -114,4 +119,31 @@ impl MyTcpListener {
         Ok(())
     }
 
+    pub fn post_json<T: Serialize>(
+        buffer: &mut [u8],
+        stream: &mut MyTcpStream,
+        path: &str,
+        data: &T,
+    ) -> Result<String, std::io::Error> {
+        // Serialize the JSON data
+        let json_data = serde_json::to_string(data)?;
+
+        // Send the HTTP POST request with the JSON data
+        let request = format!(
+            "POST {} HTTP/1.1\r\n\
+            Content-Type: application/json\r\n\
+            Content-Length: {}\r\n\
+            \r\n\
+            {}",
+            path,
+            json_data.len(),
+            json_data
+        );
+        stream.write(request.as_bytes())?;
+
+        // Read the response
+        let len = stream.read(buffer)?;
+        let response = String::from_utf8_lossy(&buffer[..len]).to_string();
+        Ok(response)
+    }
 }
