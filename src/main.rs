@@ -24,7 +24,7 @@ fn main() -> std::io::Result<()> {
             let mut buffer = [0; 1024];
             MyTcpListener::serve_html(&mut buffer, &mut stream, "src/views").unwrap();
         })
-       
+
         // MyTcpListener::post_json(&mut buffer, &mut stream, "/login", |json| {
         //     json["username"] = serde_json::Value::String("my_username".to_string());
         //     json["password"] = serde_json::Value::String("my_password".to_string());

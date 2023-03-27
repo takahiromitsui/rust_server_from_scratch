@@ -1,3 +1,4 @@
+use std::sync::{mpsc, Arc, Mutex};
 use std::{net::SocketAddr, os::unix::prelude::RawFd};
 
 use std::io;
@@ -129,13 +130,13 @@ impl MyTcpListener {
     {
         // Create an empty JSON value
         let mut json_data = serde_json::json!({});
-    
+
         // Call the closure to update the JSON value with user input
         update_json(&mut json_data);
-    
+
         // Serialize the JSON data
         let json_data_str = serde_json::to_string(&json_data)?;
-        
+
         // Send the HTTP POST request with the JSON data
         let request = format!(
             "POST {} HTTP/1.1\r\n\
@@ -154,38 +155,61 @@ impl MyTcpListener {
         let response = String::from_utf8_lossy(&buffer[..len]).to_string();
         let response_lines: Vec<&str> = response.lines().collect();
         if response_lines.len() == 0 {
-           println!("No response from server");
+            println!("No response from server");
         } else {
-              let response_line = response_lines[0];
-              let tokens: Vec<&str> = response_line.split_whitespace().collect();
-              let status_code = tokens[1];
-              println!("Status code: {}", status_code);
-              println!("Response: {}", response);
+            let response_line = response_lines[0];
+            let tokens: Vec<&str> = response_line.split_whitespace().collect();
+            let status_code = tokens[1];
+            println!("Status code: {}", status_code);
+            println!("Response: {}", response);
         }
-        
+
         Ok(response)
     }
-    
 }
 
 use std::thread;
 pub struct ThreadPool {
-    threads: Vec<thread::JoinHandle<()>>,
+    workers: Vec<Worker>,
+    sender: mpsc::Sender<Job>,
 }
+
+type Job = Box<dyn FnOnce() + Send + 'static>;
 
 impl ThreadPool {
     pub fn new(size: usize) -> ThreadPool {
         assert!(size > 0);
-        let threads = Vec::with_capacity(size);
-        for _ in 0..size {
-            
+
+        let (sender, receiver) = mpsc::channel();
+        let receiver = Arc::new(Mutex::new(receiver));
+        let mut workers = Vec::with_capacity(size);
+        for id in 0..size {
+            workers.push(Worker::new(id, Arc::clone(&receiver)));
         }
-        ThreadPool { threads }
+        ThreadPool { workers, sender }
     }
 
-    pub fn execute<F>(&self, _f: F)
+    pub fn execute<F>(&self, f: F)
     where
         F: FnOnce() + Send + 'static,
     {
+        let job = Box::new(f);
+        self.sender.send(job).unwrap();
+    }
+}
+
+struct Worker {
+    id: usize,
+    thread: thread::JoinHandle<()>,
+}
+
+impl Worker {
+    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
+        let thread = thread::spawn(move || loop {
+            let job = receiver.lock().unwrap().recv().unwrap();
+            println!("Worker {} got a job; executing.", id);
+            job();
+        });
+        Worker { id, thread }
     }
 }
