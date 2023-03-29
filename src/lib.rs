@@ -116,6 +116,7 @@ impl MyTcpListener {
             }
         };
         stream.write(response.as_bytes())?;
+        buffer.iter_mut().for_each(|b| *b = 0);
         Ok(())
     }
 
