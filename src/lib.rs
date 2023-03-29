@@ -76,11 +76,12 @@ impl MyTcpListener {
     }
 
     pub fn serve_html(
-        buffer: &mut [u8],
+        // buffer: &mut [u8],
         stream: &mut MyTcpStream,
         root: &str,
     ) -> Result<(), std::io::Error> {
-        let val_read = stream.read(buffer);
+        let mut buffer = [0; 1024];
+        let val_read = stream.read(&mut buffer);
         let request = String::from_utf8_lossy(&buffer[..val_read.unwrap()]);
         let request_lines: Vec<&str> = request.lines().collect();
         let request_line = request_lines[0];
@@ -120,7 +121,7 @@ impl MyTcpListener {
     }
 
     pub fn post_json<F>(
-        buffer: &mut [u8],
+        // buffer: &mut [u8],
         stream: &mut MyTcpStream,
         path: &str,
         update_json: F,
@@ -151,7 +152,8 @@ impl MyTcpListener {
         stream.write(request.as_bytes())?;
 
         // Read the response
-        let len = stream.read(buffer)?;
+        let mut buffer = [0; 1024];
+        let len = stream.read(&mut buffer)?;
         let response = String::from_utf8_lossy(&buffer[..len]).to_string();
         let response_lines: Vec<&str> = response.lines().collect();
         if response_lines.len() == 0 {
