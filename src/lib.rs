@@ -92,7 +92,22 @@ impl MyTcpListener {
         let request_lines: Vec<&str> = request.lines().collect();
         let request_line = request_lines[0];
         let tokens: Vec<&str> = request_line.split_whitespace().collect();
-        println!("{:?}", request);
+        //
+        let headers = request_lines[1..].to_vec();
+        let mut content_length: Option<usize> = None;
+        for header in headers {
+            let parts: Vec<&str> = header.splitn(2, ": ").collect();
+            if parts.len() == 2 && parts[0].to_lowercase() == "content-length" {
+                content_length = Some(parts[1].parse().unwrap());
+                println!("{:?}", content_length);
+                break;
+            }
+        }
+        let content_length = content_length.unwrap_or(0);
+        if content_length> buffer.len() {
+            println!("Buffer is not enough")
+        }
+
     
         // get the requested file path from the URL
         let (file_path, is_post) = if tokens[1] == "/" {
