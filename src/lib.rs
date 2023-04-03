@@ -118,8 +118,9 @@ impl MyTcpListener {
             let is_post = parts.next().map_or(false, |p| p == "post=true");
             (file_path, is_post)
         };
-    
-        if is_post && tokens[0] == "POST" && tokens[1] == "/message" {
+        // println!("{} {}", tokens[0], tokens[1]);
+        if tokens[0] == "POST" && tokens[1] == "/message" {
+            println!("POST /message is called");
             Self::post_json(stream, "/message", Self::update_json);
             return Ok(())
         }
@@ -160,11 +161,18 @@ impl MyTcpListener {
     where
         F: Fn(&str) -> Result<Message, String> + Send + Sync + 'static,
     {
-        if path == "/message" {
+            println!("post_json is called");
+            
             let mut buffer = [0; 1024];
             let val_read = stream.read(&mut buffer);
+            if val_read.is_err() {
+                println!("Error reading from connection: {}", val_read.err().unwrap());
+                return;
+            }
+            println!("val_read: {:?}", val_read);
             let request = String::from_utf8_lossy(&buffer[..val_read.unwrap()]);
             let body = request.splitn(2, "\r\n\r\n").nth(1).unwrap_or("");
+            println!("request: {}", request);
             println!("body: {}", body);
             match handler(body) {
                 Ok(msg) => {
@@ -185,7 +193,6 @@ impl MyTcpListener {
                     stream.write(response.as_bytes()).unwrap();
                 }
             }
-        }
     }
     
 }
