@@ -1,12 +1,5 @@
 use rust_server::{MyTcpListener, ThreadPool};
-use serde::Serialize;
-use std::sync::{Arc, Mutex};
 
-#[derive(Serialize)]
-struct Message {
-    text: String,
-    author: String,
-}
 
 fn main() -> std::io::Result<()> {
     let addr = "127.0.0.1:8080";

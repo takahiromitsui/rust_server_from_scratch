@@ -3,28 +3,20 @@
   <head>
     <meta charset="utf-8">
     <title>Chat App</title>
+    <!-- <script src="/script.js" charset="utf-8" defer></script> -->
   </head>
   <body>
     <main>
-      <div id="content">
-
-        <div id="messages">
-          <template id="message">
-            <div class="message">
-              <span class="username"></span>
-              <span class="text"></span>
-            </div>
-          </template>
+      <form id="message-form">
+        <div>
+            <label for="text">Text:</label>
+            <input type="text" id="text" name="text">
         </div>
-
-        <form id="new-message">
-          <input type="text" name="username" id="username" maxlength="19"
-            placeholder="guest" autocomplete="off">
-          <input type="text" name="message" id="message" autocomplete="off"
-              placeholder="Send a message..." autofocus>
-          <button type="submit" id="send">Send</button>
-        </form>
-      </div>
-    </main>
+        <div>
+            <label for="guest">Guest:</label>
+            <input type="text" id="guest" name="guest">
+        </div>
+        <button type="submit">Submit</button>
+      </form>      
   </body>
 </html>

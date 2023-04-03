@@ -2,6 +2,13 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::{net::SocketAddr, os::unix::prelude::RawFd};
 
 use std::{io, thread};
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize)]
+pub struct Message {
+    text: String,
+    guest: String,
+}
 
 pub struct MyTcpStream {
     fd: RawFd,
@@ -76,7 +83,6 @@ impl MyTcpListener {
     }
 
     pub fn serve_html(
-        // buffer: &mut [u8],
         stream: &mut MyTcpStream,
         root: &str,
     ) -> Result<(), std::io::Error> {
@@ -86,13 +92,23 @@ impl MyTcpListener {
         let request_lines: Vec<&str> = request.lines().collect();
         let request_line = request_lines[0];
         let tokens: Vec<&str> = request_line.split_whitespace().collect();
-
+        println!("{:?}", request);
+    
         // get the requested file path from the URL
-        let file_path = if tokens[1] == "/" {
-            "/index"
+        let (file_path, is_post) = if tokens[1] == "/" {
+            ("/index", false)
         } else {
-            tokens[1]
+            let mut parts = tokens[1].splitn(2, '?');
+            let file_path = parts.next().unwrap();
+            let is_post = parts.next().map_or(false, |p| p == "post=true");
+            (file_path, is_post)
         };
+    
+        if is_post && tokens[0] == "POST" && tokens[1] == "/message" {
+            Self::post_json(stream, "/message", Self::update_json);
+            return Ok(())
+        }
+    
         let file = std::fs::read_to_string(format!("{}{}.html", root, file_path));
         let not_found = std::fs::read_to_string(format!("{}/404.html", root));
         // write back to the new socket
@@ -120,54 +136,43 @@ impl MyTcpListener {
         Ok(())
     }
 
-    pub fn post_json<F>(
-        // buffer: &mut [u8],
-        stream: &mut MyTcpStream,
-        path: &str,
-        update_json: F,
-    ) -> Result<String, std::io::Error>
-    where
-        F: FnOnce(&mut serde_json::Value),
-    {
-        // Create an empty JSON value
-        let mut json_data = serde_json::json!({});
-
-        // Call the closure to update the JSON value with user input
-        update_json(&mut json_data);
-
-        // Serialize the JSON data
-        let json_data_str = serde_json::to_string(&json_data)?;
-
-        // Send the HTTP POST request with the JSON data
-        let request = format!(
-            "POST {} HTTP/1.1\r\n\
-            Content-Type: application/json\r\n\
-            Content-Length: {}\r\n\
-            \r\n\
-            {}",
-            path,
-            json_data_str.len(),
-            json_data_str
-        );
-        stream.write(request.as_bytes())?;
-
-        // Read the response
-        let mut buffer = [0; 1024];
-        let len = stream.read(&mut buffer)?;
-        let response = String::from_utf8_lossy(&buffer[..len]).to_string();
-        let response_lines: Vec<&str> = response.lines().collect();
-        if response_lines.len() == 0 {
-            println!("No response from server");
-        } else {
-            let response_line = response_lines[0];
-            let tokens: Vec<&str> = response_line.split_whitespace().collect();
-            let status_code = tokens[1];
-            println!("Status code: {}", status_code);
-            println!("Response: {}", response);
-        }
-
-        Ok(response)
+    pub fn update_json(body: &str) -> Result<Message, String> {
+        serde_json::from_str(body).map_err(|e| e.to_string())
     }
+   
+
+    pub fn post_json<F>(stream: &mut MyTcpStream, path: &str, handler: F)
+    where
+        F: Fn(&str) -> Result<Message, String> + Send + Sync + 'static,
+    {
+        if path == "/message" {
+            let mut buffer = [0; 1024];
+            let val_read = stream.read(&mut buffer);
+            let request = String::from_utf8_lossy(&buffer[..val_read.unwrap()]);
+            let body = request.splitn(2, "\r\n\r\n").nth(1).unwrap_or("");
+            println!("body: {}", body);
+            match handler(body) {
+                Ok(msg) => {
+                    let response = serde_json::to_string(&msg).unwrap();
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                        response.len(),
+                        response
+                    );
+                    stream.write(response.as_bytes()).unwrap();
+                }
+                Err(e) => {
+                    let response = format!(
+                        "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
+                        e.len(),
+                        e
+                    );
+                    stream.write(response.as_bytes()).unwrap();
+                }
+            }
+        }
+    }
+    
 }
 
 pub struct ThreadPool {
