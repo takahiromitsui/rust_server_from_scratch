@@ -3,9 +3,9 @@ use std::net::TcpStream;
 use std::sync::{mpsc, Arc, Mutex};
 use std::{net::SocketAddr, os::unix::prelude::RawFd};
 
-use std::{io, thread};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::{io, thread};
 
 #[derive(Serialize, Deserialize)]
 pub struct Message {
@@ -90,7 +90,7 @@ impl MyTcpListener {
         return Ok(MyTcpStream::new(stream_fd));
     }
 
-    pub fn get_headers(stream: &mut TcpStream)-> Vec<String> {
+    pub fn get_headers(stream: &mut TcpStream) -> Vec<String> {
         // default buffer is 8KB
         let buf_reader = io::BufReader::new(stream);
         let headers: Vec<_> = buf_reader
@@ -100,57 +100,54 @@ impl MyTcpListener {
             .collect();
         headers
     }
-        
 
-    pub fn serve_html(
-        mut stream: TcpStream,
-        root: &str,
-    )  {
-        let headers = MyTcpListener::get_headers(& mut stream);
-
+    pub fn handle_connection(mut stream: TcpStream, root: &str) {
+        let headers = MyTcpListener::get_headers(&mut stream);
         let method = headers[0].split_whitespace().nth(0).unwrap();
         let path = headers[0].split_whitespace().nth(1).unwrap();
-        println!("method: {}", method);
-        println!("path: {}", path);
 
         if method == "GET" {
-            let mut file_path = root.to_string();
-            if path == "/" {
-                file_path.push_str("/index");
-            } else {
-                file_path.push_str(path);
-            }
-
-            let file = std::fs::read_to_string(format!("{}.html", file_path));
-            let not_found = std::fs::read_to_string(format!("{}/404.html", root));
-        // // write back to the new socket
-            let response = match file {
-                Ok(body) => {
-                    format!(
-                        "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: {}\n\n{}",
-                        body.len(),
-                        body
-                    )
-                }
-                Err(_) => {
-                    let body = match not_found {
-                        Ok(body) => body,
-                        Err(_) => "404 Not Found".to_string(),
-                    };
-                    format!(
-                        "HTTP/1.1 404 Not Found\nContent-Type: text/html\nContent-Length: {}\n\n{}",
-                        body.len(),
-                        body
-                    )
-                }
-            };
-            stream.write_all(response.as_bytes()).unwrap();
+            Self::serve_html(stream, root, path);
         } else if method == "POST" {
-            // let stream = stream.try_clone().unwrap();
-            Self::post_json(stream, path, Self::update_json)
+            Self::post_json(stream, path, Self::update_json);
         } else {
             println!("Method not supported");
         }
+    }
+
+    pub fn serve_html(mut stream: TcpStream, root: &str, path: &str) {
+        let mut file_path = root.to_string();
+        if path == "/" {
+            file_path.push_str("/index");
+        } else {
+            file_path.push_str(path);
+        }
+
+        let file = std::fs::read_to_string(format!("{}.html", file_path));
+        let not_found = std::fs::read_to_string(format!("{}/404.html", root));
+        // // write back to the new socket
+        let response = match file {
+            Ok(body) => {
+                format!(
+                    "HTTP/1.1 200 OK\nContent-Type: text/html\nContent-Length: {}\n\n{}",
+                    body.len(),
+                    body
+                )
+            }
+            Err(_) => {
+                let body = match not_found {
+                    Ok(body) => body,
+                    Err(_) => "404 Not Found".to_string(),
+                };
+                format!(
+                    "HTTP/1.1 404 Not Found\nContent-Type: text/html\nContent-Length: {}\n\n{}",
+                    body.len(),
+                    body
+                )
+            }
+        };
+        stream.write_all(response.as_bytes()).unwrap();
+
         // let mut buffer = [0; 1024];
         // let val_read = stream.read(&mut buffer);
         // let request = String::from_utf8_lossy(&buffer[..val_read.unwrap()]);
@@ -173,7 +170,6 @@ impl MyTcpListener {
         //     println!("Buffer is not enough")
         // }
 
-    
         // // get the requested file path from the URL
         // let (file_path, is_post) = if tokens[1] == "/" {
         //     ("/index", false)
@@ -187,7 +183,7 @@ impl MyTcpListener {
         //     Self::post_json(stream, "/message", Self::update_json);
         //     return Ok(())
         // }
-    
+
         // let file = std::fs::read_to_string(format!("{}{}.html", root, file_path));
         // let not_found = std::fs::read_to_string(format!("{}/404.html", root));
         // // write back to the new socket
@@ -218,15 +214,13 @@ impl MyTcpListener {
     pub fn update_json(body: &str) -> Result<Message, String> {
         serde_json::from_str(body).map_err(|e| e.to_string())
     }
-   
 
-    pub fn post_json<F>(stream: TcpStream, path: &str, handler: F) {
+    pub fn post_json<F>(mut stream: TcpStream, path: &str, handler: F) {
         println!("post_json is called");
 
-    
         // let mut buffer = [0; 1024];
         // let mut input = String::new();
-    
+
         // loop {
         //     match stream.read(&mut buffer) {
         //         Ok(n) if n > 0 => {
@@ -247,9 +241,9 @@ impl MyTcpListener {
         //         }
         //     }
         // }
-    
+
         // println!("input: {}", input);
-    
+
         // let response = match serde_json::from_str::<Value>(&input) {
         //     Ok(json) => serde_json::to_string(&json).unwrap(),
         //     Err(e) => format!("{{ \"error\": \"{}\" }}", e),
@@ -261,14 +255,12 @@ impl MyTcpListener {
         // );
         // stream.write(response.as_bytes()).unwrap();
     }
-    
-    
-    
+
     // where
     //     F: Fn(&str) -> Result<Message, String> + Send + Sync + 'static,
     // {
     //         println!("post_json is called");
-            
+
     //         let mut buffer = [0; 1024];
     //         let val_read = stream.read(&mut buffer);
     //         if val_read.is_err() {
@@ -300,7 +292,6 @@ impl MyTcpListener {
     //             }
     //         }
     // }
-    
 }
 
 pub struct ThreadPool {

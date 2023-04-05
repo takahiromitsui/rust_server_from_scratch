@@ -2,7 +2,6 @@ use std::net::TcpListener;
 
 use rust_server::{MyTcpListener, ThreadPool};
 
-
 fn main() -> std::io::Result<()> {
     let addr = "127.0.0.1:8080";
     let listener = TcpListener::bind(addr)?;
@@ -18,7 +17,7 @@ fn main() -> std::io::Result<()> {
             }
         };
         pool.execute(move || {
-            MyTcpListener::serve_html(stream.0, "src/views");
+            MyTcpListener::handle_connection(stream.0, "src/views");
         })
     }
     // loop {
