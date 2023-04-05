@@ -90,19 +90,23 @@ impl MyTcpListener {
         return Ok(MyTcpStream::new(stream_fd));
     }
 
+    pub fn get_headers(stream: &mut TcpStream)-> Vec<String> {
+        // default buffer is 8KB
+        let buf_reader = io::BufReader::new(stream);
+        let headers: Vec<_> = buf_reader
+            .lines()
+            .map(|result| result.unwrap())
+            .take_while(|line| !line.is_empty())
+            .collect();
+        headers
+    }
+        
+
     pub fn serve_html(
         mut stream: TcpStream,
         root: &str,
     )  {
-        // default buffer is 8KB
-        let buf_reader = io::BufReader::new(&mut stream);
-        // println!("{:?}", buf_reader);
-        let headers:Vec<_>= buf_reader
-        .lines()
-        .map(|result| result.unwrap())
-        .take_while(|line| !line.is_empty())
-        .collect();
-        println!("headers: {:?}", headers);
+        let headers = MyTcpListener::get_headers(& mut stream);
 
         let method = headers[0].split_whitespace().nth(0).unwrap();
         let path = headers[0].split_whitespace().nth(1).unwrap();
@@ -143,7 +147,7 @@ impl MyTcpListener {
             stream.write_all(response.as_bytes()).unwrap();
         } else if method == "POST" {
             // let stream = stream.try_clone().unwrap();
-            // Self::post_json(*buf_reader, path, Self::update_json)
+            Self::post_json(stream, path, Self::update_json)
         } else {
             println!("Method not supported");
         }
