@@ -101,6 +101,16 @@ impl MyTcpListener {
         headers
     }
 
+
+    pub fn read_body(stream: &mut TcpStream, content_length: usize) -> String {
+        let mut body = String::new();
+        let mut buf = vec![0; content_length];
+        stream.read_exact(&mut buf).unwrap();
+        body.push_str(&String::from_utf8(buf).unwrap());
+        println!("body: {}", body);
+        body
+    }
+
     pub fn handle_connection(mut stream: TcpStream, root: &str) {
         let headers = MyTcpListener::get_headers(&mut stream);
         let method = headers[0].split_whitespace().nth(0).unwrap();
